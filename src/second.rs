@@ -6,26 +6,29 @@
 
 // Take aways:
 //   1) Use Option<T>::take() to replace the primitive mem::replace
+//   2) template syntax is `impl<T> Class<T> {...}`
+//   3) Rust can infer type of container by the first inserting element
+//      so we can create a list of i32 by List::new() without specifying "i32"
 
-pub struct List {
-    head: Link,
+pub struct List<T> {
+    head: Link<T>,
 }
 
-type Link = Option<Box<Node>>;
+type Link<T> = Option<Box<Node<T>>>;
 
 // node is a struct of value + pointer to next
-struct Node {
-    value: i32,
-    next: Link,
+struct Node<T> {
+    value: T,
+    next: Link<T>,
 }
 
-impl List {
+impl<T> List<T> {
     pub fn new() -> Self {
         return List { head: None };
     }
 
     // a stack
-    pub fn push(&mut self, elem: i32) {
+    pub fn push(&mut self, elem: T) {
         let node = Box::new(Node {
             value: elem,
             next: self.head.take(),
@@ -34,7 +37,7 @@ impl List {
         self.head = Some(node);
     }
 
-    pub fn pop(&mut self) -> Option<i32> {
+    pub fn pop(&mut self) -> Option<T> {
         // match option { None => None, Some(x) => Some(y) }
         // syntax sugar:
         // if None, return None
@@ -48,7 +51,7 @@ impl List {
 
 // we have to implement Drop in an iterative manner
 // to avoid recursive call blowing the stack
-impl Drop for List {
+impl<T> Drop for List<T> {
     fn drop(&mut self) {
         let mut cur_link = self.head.take();
         // `while let` == "do this thing until this pattern doesn't match"
@@ -67,6 +70,8 @@ mod first_list_tests {
 
     #[test]
     fn push_and_pop() {
+        // type can be infered.
+        // let mut list = List::<i32>::new();
         let mut list = List::new();
 
         // Check empty list behaves right
