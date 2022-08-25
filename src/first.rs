@@ -10,6 +10,7 @@ struct Node {
     next: Link,
 }
 
+// we can substitute it with Option<Node>
 // next item can either be empty, or a node
 enum Link {
     Empty,
@@ -42,6 +43,35 @@ impl List {
                 return Some(node.value);
             }
         }
+    }
+}
+
+// we have to implement Drop in an iterative manner
+// to avoid recursive call blowing the stack
+impl Drop for List {
+    fn drop(&mut self) {
+        let mut cur_link = mem::replace(&mut self.head, Link::Empty);
+        loop {
+            match cur_link {
+                Link::Empty => {
+                    // all nodes dropped
+                    break;
+                }
+
+                Link::More(mut node) => {
+                    // it does two things:
+                    //   1) remove ownership to the next node by replacing next with Empty
+                    //   2) assign next node to current node
+                    cur_link = mem::replace(&mut node.next, Link::Empty);
+                }
+            }
+        }
+
+        // more elegant:
+        // `while let` == "do this thing until this pattern doesn't match"
+        // while let Link::More(mut node) = cur_link {
+        //     cur_link = mem::replace(&mut node.next, Link::Empty);
+        // }
     }
 }
 
