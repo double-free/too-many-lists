@@ -9,6 +9,8 @@
 //   2) template syntax is `impl<T> Class<T> {...}`
 //   3) Rust can infer type of container by the first inserting element
 //      so we can create a list of i32 by List::new() without specifying "i32"
+//   4) use as_ref() and as_mut() to borrow an Option's content
+//   5) closure argument uses pattern match
 
 pub struct List<T> {
     head: Link<T>,
@@ -45,6 +47,18 @@ impl<T> List<T> {
         return self.head.take().map(|node| {
             self.head = node.next;
             return node.value;
+        });
+    }
+
+    pub fn peek(&self) -> Option<&T> {
+        return self.head.as_ref().map(|node| {
+            return &node.value;
+        });
+    }
+
+    pub fn peek_mut(&mut self) -> Option<&mut T> {
+        return self.head.as_mut().map(|node| {
+            return &mut node.value;
         });
     }
 }
@@ -97,5 +111,35 @@ mod first_list_tests {
         // Check exhaustion
         assert_eq!(list.pop(), Some(1));
         assert_eq!(list.pop(), None);
+    }
+
+    #[test]
+    fn peek() {
+        let mut list = List::new();
+        assert_eq!(list.peek(), None);
+        assert_eq!(list.peek_mut(), None);
+        list.push(1);
+        list.push(2);
+        list.push(3);
+
+        assert_eq!(list.peek(), Some(&3));
+        assert_eq!(list.peek_mut(), Some(&mut 3));
+
+        // list.peek_mut().map(|&mut value| {
+        //     value = 42
+        // });
+
+        // above code does not work, because:
+        // the closure argument is a "pattern match",
+        // list.peek_mut() gives us a &mut T,
+        // in above code, "value" is matched to "T"
+        // which is not a mut ref, but a copied integer
+
+        list.peek_mut().map(|value| {
+            *value = 42;
+        });
+
+        assert_eq!(list.peek(), Some(&42));
+        assert_eq!(list.pop(), Some(42));
     }
 }
