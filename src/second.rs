@@ -12,6 +12,10 @@
 //   4) use as_ref() and as_mut() to borrow an Option's content
 //   5) closure argument uses pattern match
 //   6) use associate type instead of genrics for a trait
+//   7) "lifetime": it's basically an extra implicit argument.
+//      usually it can be infered by the compiler from input. It guarantees
+//      the input ref MUST live at least as long as the output ref.
+//   8) use as_deref() to convert Option<T> to Option<&T>
 
 pub struct List<T> {
     head: Link<T>,
@@ -76,12 +80,24 @@ impl<T> Drop for List<T> {
     }
 }
 
+// take the list itself
 pub struct IntoIter<T>(List<T>);
+// const ref
+pub struct Iter<'a, T> {
+    next: Option<&'a Node<T>>,
+}
 
 // iterators
 impl<T> List<T> {
     pub fn into_iter(self) -> IntoIter<T> {
         return IntoIter(self);
+    }
+    pub fn iter(&self) -> Iter<T> {
+        // we want an Option<&Node<T>>, but we have an Option<Node<T>>
+        // as_deref() converts from Option<T> to Option<&T>
+        return Iter {
+            next: self.head.as_deref(),
+        };
     }
 }
 
@@ -94,6 +110,19 @@ impl<T> Iterator for IntoIter<T> {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
         return self.0.pop();
+    }
+}
+
+impl<'a, T> Iterator for Iter<'a, T> {
+    // Item is a const ref of T
+    type Item = &'a T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next.map(|node| {
+            // next is an Option<Node<T>>, but we want to return Option<&Node<T>>
+            // still, we need as_deref
+            self.next = node.next.as_deref();
+            return &node.value;
+        })
     }
 }
 
@@ -177,5 +206,21 @@ mod first_list_tests {
         assert_eq!(iter.next(), Some(2));
         assert_eq!(iter.next(), Some(1));
         assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn iter() {
+        let mut list = List::new();
+        list.push(1);
+        list.push(2);
+        list.push(3);
+
+        let mut iter = list.iter();
+        assert_eq!(iter.next(), Some(&3));
+        assert_eq!(iter.next(), Some(&2));
+        assert_eq!(iter.next(), Some(&1));
+
+        let mut iter1 = list.iter();
+        assert_eq!(iter1.next(), Some(&3));
     }
 }
