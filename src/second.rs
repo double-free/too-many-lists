@@ -76,7 +76,16 @@ impl<T> Drop for List<T> {
     }
 }
 
-impl<T> Iterator for List<T> {
+pub struct IntoIter<T>(List<T>);
+
+// iterators
+impl<T> List<T> {
+    pub fn into_iter(self) -> IntoIter<T> {
+        return IntoIter(self);
+    }
+}
+
+impl<T> Iterator for IntoIter<T> {
     // See usage of "associate type" in traits here:
     //   https://doc.rust-lang.org/book/ch19-03-advanced-traits.html
     // Using associate types (instead of genrics Iterator<T>) restricts that
@@ -84,7 +93,7 @@ impl<T> Iterator for List<T> {
     // (we can't have Iterator<String> and Iterator<i32> at the same time)
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
-        return self.pop();
+        return self.0.pop();
     }
 }
 
