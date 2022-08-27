@@ -11,6 +11,7 @@
 //      so we can create a list of i32 by List::new() without specifying "i32"
 //   4) use as_ref() and as_mut() to borrow an Option's content
 //   5) closure argument uses pattern match
+//   6) use associate type instead of genrics for a trait
 
 pub struct List<T> {
     head: Link<T>,
@@ -72,6 +73,18 @@ impl<T> Drop for List<T> {
         while let Some(mut node) = cur_link {
             cur_link = node.next.take();
         }
+    }
+}
+
+impl<T> Iterator for List<T> {
+    // See usage of "associate type" in traits here:
+    //   https://doc.rust-lang.org/book/ch19-03-advanced-traits.html
+    // Using associate types (instead of genrics Iterator<T>) restricts that
+    // we have only 1 implementation for a trait on a type
+    // (we can't have Iterator<String> and Iterator<i32> at the same time)
+    type Item = T;
+    fn next(&mut self) -> Option<Self::Item> {
+        return self.pop();
     }
 }
 
@@ -141,5 +154,19 @@ mod first_list_tests {
 
         assert_eq!(list.peek(), Some(&42));
         assert_eq!(list.pop(), Some(42));
+    }
+
+    #[test]
+    fn into_iter() {
+        let mut list = List::new();
+        list.push(1);
+        list.push(2);
+        list.push(3);
+
+        let mut iter = list.into_iter();
+        assert_eq!(iter.next(), Some(3));
+        assert_eq!(iter.next(), Some(2));
+        assert_eq!(iter.next(), Some(1));
+        assert_eq!(iter.next(), None);
     }
 }
