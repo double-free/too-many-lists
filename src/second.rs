@@ -16,6 +16,8 @@
 //      usually it can be infered by the compiler from input. It guarantees
 //      the input ref MUST live at least as long as the output ref.
 //   8) use as_deref() to convert Option<T> to Option<&T>
+//   9) iter_mut will take the ownership of element
+//   10) Option<T>::map consumes the option itself.
 
 pub struct List<T> {
     head: Link<T>,
@@ -86,6 +88,9 @@ pub struct IntoIter<T>(List<T>);
 pub struct Iter<'a, T> {
     next: Option<&'a Node<T>>,
 }
+pub struct IterMut<'a, T> {
+    next: Option<&'a mut Node<T>>,
+}
 
 // iterators
 impl<T> List<T> {
@@ -97,6 +102,11 @@ impl<T> List<T> {
         // as_deref() converts from Option<T> to Option<&T>
         return Iter {
             next: self.head.as_deref(),
+        };
+    }
+    pub fn iter_mut(&mut self) -> IterMut<T> {
+        return IterMut {
+            next: self.head.as_deref_mut(),
         };
     }
 }
@@ -117,11 +127,26 @@ impl<'a, T> Iterator for Iter<'a, T> {
     // Item is a const ref of T
     type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
+        // the "self.next" (an Option<&Node<T>>) is consumed and updated
         self.next.map(|node| {
-            // next is an Option<Node<T>>, but we want to return Option<&Node<T>>
+            // node.next is an Option<Node<T>>, but we want to return Option<&Node<T>>
             // still, we need as_deref
             self.next = node.next.as_deref();
             return &node.value;
+        })
+    }
+}
+
+impl<'a, T> Iterator for IterMut<'a, T> {
+    // Item is a mutable ref of T
+    type Item = &'a mut T;
+    fn next(&mut self) -> Option<Self::Item> {
+        // "take" ownership of "self.next"
+        // which is an iterator "Option<&'a mut Node<T>>,"
+        // not the node itself
+        self.next.take().map(|node| {
+            self.next = node.next.as_deref_mut();
+            return &mut node.value;
         })
     }
 }
@@ -222,5 +247,26 @@ mod first_list_tests {
 
         let mut iter1 = list.iter();
         assert_eq!(iter1.next(), Some(&3));
+    }
+
+    #[test]
+    fn iter_mut() {
+        let mut list = List::new();
+        list.push(1);
+        list.push(2);
+        list.push(3);
+
+        let mut iter = list.iter_mut();
+        assert_eq!(iter.next(), Some(&mut 3));
+        assert_eq!(iter.next(), Some(&mut 2));
+        assert_eq!(iter.next(), Some(&mut 1));
+
+        // modify
+        for value in list.iter_mut() {
+            *value *= 2;
+        }
+
+        let mut iter1 = list.iter_mut();
+        assert_eq!(iter1.next(), Some(&mut 6));
     }
 }
