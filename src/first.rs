@@ -1,4 +1,4 @@
-// Take aways:
+// Takeaways:
 //   1) A List is either Empty or an Element followed by a List (Option<Node>)
 //   2) Use mem::replace to take ownership of a &mut ref
 //   3) Use cfg(test) to suppress compile warning for unit test

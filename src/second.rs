@@ -4,7 +4,7 @@
 // Lifetimes
 // Iterators
 
-// Take aways:
+// Takeaways:
 //   1) Use Option<T>::take() to replace the primitive mem::replace
 //   2) template syntax is `impl<T> Class<T> {...}`
 //   3) Rust can infer type of container by the first inserting element
