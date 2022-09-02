@@ -1,4 +1,4 @@
-// To learn about:
+// "An Ok Stack", To learn about:
 // Advanced Option use
 // Generics
 // Lifetimes
