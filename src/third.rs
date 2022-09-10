@@ -7,6 +7,12 @@
 //   2. It is immutable, because the prepend(), tail() both return a new List
 //   3. Like the mutable list (Box instead of Rc), we need to fix the "recursive destructor"
 //   4. Rc::try_unwrap can TAKE the value of the RC pointer if there is only 1 strong ref.
+//   5. Rust models thread-safety in a first-class way with two traits: Send and Sync.
+//      A type is Send if it's safe to move to another thread.
+//      A type is Sync if it's safe to share between multiple threads.
+//      That is, if T is Sync, &T is Send. Safe in this case means it's impossible to cause data races
+//   6. Rc is a "cell", it lets you mutate through a shared reference (modify the counter),
+//      it only works in single-threaded context. Arc uses an "atomic", the counter is thread-safe
 
 use std::rc::Rc;
 
