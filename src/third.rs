@@ -5,6 +5,8 @@
 //   1. Option<T>::map argument function must return a valid value (U), while
 //      Option<T>::and_then argument function can return nullable Option<U>
 //   2. It is immutable, because the prepend(), tail() both return a new List
+//   3. Like the mutable list (Box instead of Rc), we need to fix the "recursive destructor"
+//   4. Rc::try_unwrap can TAKE the value of the RC pointer if there is only 1 strong ref.
 
 use std::rc::Rc;
 
@@ -14,6 +16,7 @@ pub struct List<T> {
 
 type Link<T> = Option<Rc<Node<T>>>;
 
+#[derive(Debug)]
 struct Node<T> {
     value: T,
     next: Link<T>,
@@ -44,6 +47,21 @@ impl<T> List<T> {
 
     pub fn head(&self) -> Option<&T> {
         self.head.as_ref().map(|node| &node.value)
+    }
+}
+
+impl<T> Drop for List<T> {
+    fn drop(&mut self) {
+        let mut head = self.head.take();
+        while let Some(shared_node) = head {
+            // try do drop the value
+            match Rc::try_unwrap(shared_node) {
+                Ok(node) => {
+                    head = node.next;
+                }
+                Err(_) => break,
+            };
+        }
     }
 }
 
