@@ -14,6 +14,7 @@
 //      so we need to manually pop elements in Drop
 //   7. When we borrow from a RefCell, we get a Ref<T> type (instead of &T), which is a reference with lifetime
 //      This is how it implements dynamic borrow checking.
+//   8. A deque can iterate from both front and back, we need to implement both next() and next_back()
 
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
@@ -142,6 +143,29 @@ impl<T> Drop for List<T> {
     }
 }
 
+// Iterators
+pub struct IntoIter<T>(List<T>);
+
+impl<T> List<T> {
+    pub fn into_iter(self) -> IntoIter<T> {
+        IntoIter(self)
+    }
+}
+
+// iterator from front
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.pop_front()
+    }
+}
+// iterator from back
+impl<T> DoubleEndedIterator for IntoIter<T> {
+    fn next_back(&mut self) -> Option<T> {
+        self.0.pop_back()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::List;
@@ -217,5 +241,20 @@ mod test {
         assert_eq!(&mut *list.peek_front_mut().unwrap(), &mut 3);
         assert_eq!(&*list.peek_back().unwrap(), &1);
         assert_eq!(&mut *list.peek_back_mut().unwrap(), &mut 1);
+    }
+
+    #[test]
+    fn into_iter() {
+        let mut list = List::new();
+        list.push_front(1);
+        list.push_front(2);
+        list.push_front(3);
+
+        let mut iter = list.into_iter();
+        assert_eq!(iter.next(), Some(3));
+        assert_eq!(iter.next_back(), Some(1));
+        assert_eq!(iter.next(), Some(2));
+        assert_eq!(iter.next_back(), None);
+        assert_eq!(iter.next(), None);
     }
 }
