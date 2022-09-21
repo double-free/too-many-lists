@@ -15,6 +15,7 @@
 //   7. When we borrow from a RefCell, we get a Ref<T> type (instead of &T), which is a reference with lifetime
 //      This is how it implements dynamic borrow checking.
 //   8. A deque can iterate from both front and back, we need to implement both next() and next_back()
+//   9. There is no easy way to implement Iter and IterMut with RefCell
 
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
@@ -143,7 +144,7 @@ impl<T> Drop for List<T> {
     }
 }
 
-// Iterators
+// iterator that takes ownship, IntoIter
 pub struct IntoIter<T>(List<T>);
 
 impl<T> List<T> {
@@ -165,6 +166,53 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
         self.0.pop_back()
     }
 }
+
+// const ref, Iter, no elegant implementation
+// pub struct Iter<'a, T>(Option<Ref<'a, Node<T>>>);
+// impl<T> List<T> {
+//     fn iter(&self) -> Iter<T> {
+//         Iter(self.head.as_ref().map(|head| head.borrow()))
+//     }
+// }
+
+// Version 1: borrowed ref
+// This implementation does not work because borrowed Ref can't outlive RefCell
+// we assign the next_node "borrowed" from node_ref to "self" member variable
+// it means the self.0 can live at most the same to node_ref, which is trashed in Ref::map
+// impl<'a, T> Iterator for Iter<'a, T> {
+//     type Item = Ref<'a, T>;
+//     fn next(&mut self) -> Option<Self::Item> {
+//         self.0.take().map(|node_ref| {
+//             self.0 = node_ref.next.as_ref().map(|next_node| {
+//                 next_node.borrow()
+//             });
+//             Ref::map(node_ref, |node| &node.elem)
+//         })
+//     }
+// }
+
+// Version 2: split ref
+// Ref::map_split can split a Ref into different Refs with the same lifetime
+// Compared to version 1, returning element does not need to trash node_ref, 1 less error
+// But the next_node is still dropped and can't assign to self.0
+// impl<'a, T> Iterator for Iter<'a, T> {
+//     type Item = Ref<'a, T>;
+//     fn next(&mut self) -> Option<Self::Item> {
+//         self.0.take().map(|node_ref| {
+//             let (next_node, elem) = Ref::map_split(node_ref, |node| {
+//                 (&node.next, &node.elem)
+//             });
+//             self.0 = next_node.as_ref().map(|head| head.borrow());
+//             elem
+//         })
+//     }
+// }
+
+// Version 3: create new ref
+// Given the failure of version 2, we realized that we have to create new ref.
+// The new ref needs to be consistent with next node's lifetime. It becomes a stack of Refs, no...
+
+// Version 4: copy RC, not going to work because we need reference for iterator type
 
 #[cfg(test)]
 mod test {
