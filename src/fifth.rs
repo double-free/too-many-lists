@@ -5,12 +5,28 @@
 //   1. unsafe is manageable because of privacy. As long as no combination
 //      of the APIs we expose causes bad stuff to happen, from user's perspective,
 //      the module is safe!
+//   2. "stacked borrow" can be safe, if we reborrow a ref, mutate it,
+//      and stop using the borrowed reference before using the old ref again.
+//      rust can check it in compile time
+//   3. when you convert a reference into a raw pointer, it is basically a "reborrow",
+//      but, unlike normal reference, rust can't check the stacked borrow for a raw pointer
+//   4. because of 3, the Box can't claim unique ownership of memory because a mutable raw pointer exists
+//   5. Once you start using raw pointers, try to ONLY use raw pointers.
+
+// Version 1: using Box and raw pointer, breaks the stacked borrow rule of Box
+// pub struct List<T> {
+//     head: Link<T>,
+//     tail: *mut Node<T>,
+// }
+// type Link<T> = Option<Box<Node<T>>>;
+
+// Version 2: use raw pointer only
+
 pub struct List<T> {
     head: Link<T>,
-    tail: *mut Node<T>, // NEW! AND UNSAFE!
+    tail: Link<T>,
 }
-
-type Link<T> = Option<Box<Node<T>>>;
+type Link<T> = *mut Node<T>;
 
 struct Node<T> {
     elem: T,
@@ -20,41 +36,51 @@ struct Node<T> {
 impl<T> List<T> {
     pub fn new() -> Self {
         List {
-            head: None,
+            head: std::ptr::null_mut(),
             tail: std::ptr::null_mut(),
         }
     }
 
     pub fn push(&mut self, elem: T) {
-        let mut new_tail = Box::new(Node {
-            elem: elem,
-            next: None,
-        });
+        unsafe {
+            let new_tail = Box::into_raw(Box::new(Node {
+                elem: elem,
+                next: std::ptr::null_mut(),
+            }));
 
-        // HACK: get address before it is consumed
-        let raw_tail: *mut _ = &mut *new_tail;
-
-        if self.tail.is_null() {
-            self.head = Some(new_tail);
-        } else {
-            unsafe {
-                (*self.tail).next = Some(new_tail);
+            if self.tail.is_null() {
+                // only 1 element, header is the same as tail
+                self.head = new_tail;
+            } else {
+                (*self.tail).next = new_tail;
             }
-        }
 
-        self.tail = raw_tail;
+            self.tail = new_tail;
+        }
     }
 
     pub fn pop(&mut self) -> Option<T> {
-        self.head.take().map(|head| {
-            self.head = head.next;
-            // the last node is popped
-            if self.head.is_none() {
+        unsafe {
+            if self.head.is_null() {
+                return None;
+            }
+
+            let old_head = self.head;
+            self.head = (*self.head).next;
+
+            if self.head.is_null() {
+                // no element after pop, reset tail, too.
                 self.tail = std::ptr::null_mut();
             }
 
-            return head.elem;
-        })
+            return Some(Box::from_raw(old_head).elem);
+        }
+    }
+}
+
+impl<T> Drop for List<T> {
+    fn drop(&mut self) {
+        while let Some(_) = self.pop() {}
     }
 }
 
