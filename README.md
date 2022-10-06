@@ -103,7 +103,23 @@ A type constructor F's variance is how the subtyping of its inputs affects the s
 | `*const T` | | covariant | |
 | `*mut T` | | invariant | |
 
-Apparently, we want to keep `covariant` if safety is guaranteed. If a function accepts a `Base` instance, then we expect it to accept `Derived` instance.
+The soundness of subtyping is based on the idea that it's ok to forget unnecessary details. But with references, there's always someone that remembers those details: the value being referenced. The problem with making `&mut T` covariant over `T` is that __it gives us the power to modify the original value when we don't remember all of its constraints__, which may result in meowing dogs:
+
+```Rust
+fn evil_feeder(pet: &mut Animal) {
+    let spike: Dog = ...;
+
+    // `pet` is an Animal, and Dog is a subtype of Animal,
+    // so this should be fine, right..?
+    *pet = spike;
+}
+
+fn main() {
+    let mut mr_snuggles: Cat = ...;
+    evil_feeder(&mut mr_snuggles);  // Replaces mr_snuggles with a Dog
+    mr_snuggles.meow();             // OH NO, MEOWING DOG!
+}
+```
 
 A simple rule is that __subtyping is not safe for mutable reference__. Mutable reference here means anything like `&mut T`, like `Cell<T>`, `*mut T`.
 
@@ -111,3 +127,28 @@ For a generic container type (e.g., the list we are creating), because of Rust's
 
 
 ### Phantom Data
+
+__Zero-sized__ type used to mark things that “act like” they own a T.
+
+Perhaps the most common use case for PhantomData is a struct that has an unused lifetime parameter, typically as part of some unsafe code. For example, here is a struct `Slice` that has two pointers of type `*const T`, presumably pointing into an array somewhere:
+
+```rust
+struct Slice<'a, T> {
+    start: *const T,
+    end: *const T,
+}
+```
+
+The intention is that the underlying data is only valid for the lifetime `'a`, so Slice should not outlive `'a`. However, this intent is not expressed in the code, since there are no uses of the lifetime `'a` and hence it is not clear what data it applies to. We can correct this by __telling the compiler__ to act as if the Slice struct contained a reference `&'a T`:
+
+```rust
+use std::marker::PhantomData;
+
+struct Slice<'a, T: 'a> {
+    start: *const T,
+    end: *const T,
+    phantom: PhantomData<&'a T>,
+}
+```
+
+It is recommended by the author that __any time you do use raw pointers you should always add PhantomData__ to make it clear to compiler and others what you think you are doing.
