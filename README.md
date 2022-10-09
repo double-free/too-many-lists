@@ -152,3 +152,14 @@ struct Slice<'a, T: 'a> {
 ```
 
 It is recommended by the author that __any time you do use raw pointers you should always add PhantomData__ to make it clear to compiler and others what you think you are doing.
+
+### Exception Safety
+
+Exception (panic, unwinding) is an __implicit early return__. Every single function immediately returns while panic. Why do we need to care about this, since the program is about to die?
+
+The reason is that code can keep running after a panic:
+
+- Destructors run when a function returns
+- Exceptions can be caught
+
+So, we need to make sure our unsafe collections are always in __coherent state__ whenever a panic could occur.

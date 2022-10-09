@@ -95,6 +95,105 @@ impl<T> LinkedList<T> {
     pub fn len(&self) -> usize {
         self.len
     }
+
+    pub fn front(&self) -> Option<&T> {
+        self.front.map(|node| unsafe { &node.as_ref().elem })
+    }
+
+    pub fn front_mut(&mut self) -> Option<&mut T> {
+        self.front
+            .map(|mut node| unsafe { &mut node.as_mut().elem })
+    }
+}
+
+impl<T> Drop for LinkedList<T> {
+    fn drop(&mut self) {
+        while let Some(_) = self.pop_front() {}
+    }
+}
+
+// const iterator
+pub struct Iter<'a, T> {
+    front: Link<T>,
+    back: Link<T>,
+    len: usize,
+    _boo: std::marker::PhantomData<&'a T>,
+}
+
+impl<'a, T> Iterator for Iter<'a, T> {
+    type Item = &'a T;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.len == 0 {
+            return None;
+        }
+
+        return self.front.map(|node| unsafe {
+            self.len -= 1;
+            self.front = (*node.as_ptr()).next;
+            &(*node.as_ptr()).elem
+        });
+    }
+}
+
+impl<T> LinkedList<T> {
+    pub fn iter(&self) -> Iter<T> {
+        Iter {
+            front: self.front,
+            back: self.back,
+            len: self.len,
+            _boo: std::marker::PhantomData,
+        }
+    }
+}
+
+// mutable iterator
+pub struct IterMut<'a, T> {
+    front: Link<T>,
+    back: Link<T>,
+    len: usize,
+    _boo: std::marker::PhantomData<&'a mut T>,
+}
+
+impl<'a, T> Iterator for IterMut<'a, T> {
+    type Item = &'a mut T;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.len == 0 {
+            return None;
+        }
+
+        return self.front.map(|node| unsafe {
+            self.len -= 1;
+            self.front = (*node.as_ptr()).next;
+            &mut (*node.as_ptr()).elem
+        });
+    }
+}
+
+impl<T> LinkedList<T> {
+    pub fn iter_mut(&self) -> IterMut<T> {
+        IterMut {
+            front: self.front,
+            back: self.back,
+            len: self.len,
+            _boo: std::marker::PhantomData,
+        }
+    }
+}
+
+// into iterator
+pub struct IntoIter<T>(LinkedList<T>);
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.pop_front()
+    }
+}
+
+impl<T> LinkedList<T> {
+    pub fn into_iter(self) -> IntoIter<T> {
+        IntoIter { 0: self }
+    }
 }
 
 #[cfg(test)]
@@ -139,5 +238,56 @@ mod test {
         assert_eq!(list.len(), 0);
         assert_eq!(list.pop_front(), None);
         assert_eq!(list.len(), 0);
+    }
+
+    #[test]
+    fn into_iter() {
+        let mut list = LinkedList::new();
+        list.push_front(1);
+        list.push_front(2);
+        list.push_front(3);
+
+        let mut iter = list.into_iter();
+        assert_eq!(iter.next(), Some(3));
+        assert_eq!(iter.next(), Some(2));
+        assert_eq!(iter.next(), Some(1));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn iter() {
+        let mut list = LinkedList::new();
+        list.push_front(1);
+        list.push_front(2);
+        list.push_front(3);
+
+        let mut iter = list.iter();
+        assert_eq!(iter.next(), Some(&3));
+        assert_eq!(iter.next(), Some(&2));
+        assert_eq!(iter.next(), Some(&1));
+
+        let mut iter1 = list.iter();
+        assert_eq!(iter1.next(), Some(&3));
+    }
+
+    #[test]
+    fn iter_mut() {
+        let mut list = LinkedList::new();
+        list.push_front(1);
+        list.push_front(2);
+        list.push_front(3);
+
+        let mut iter = list.iter_mut();
+        assert_eq!(iter.next(), Some(&mut 3));
+        assert_eq!(iter.next(), Some(&mut 2));
+        assert_eq!(iter.next(), Some(&mut 1));
+
+        // modify
+        for value in list.iter_mut() {
+            *value *= 2;
+        }
+
+        let mut iter1 = list.iter_mut();
+        assert_eq!(iter1.next(), Some(&mut 6));
     }
 }
