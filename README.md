@@ -163,3 +163,19 @@ The reason is that code can keep running after a panic:
 - Exceptions can be caught
 
 So, we need to make sure our unsafe collections are always in __coherent state__ whenever a panic could occur.
+
+### `Send` and `Sync` traits
+
+Like `Copy`, `Send` and `Sync` traits have absolutely __no code associated__ with them, and are just __markers__ that your type has a particular property. `Send` says that your type is safe to send to another thread. `Sync` says your type is safe to share between threads.
+
+- Something can safely be `Send` unless it shares mutable state with something else without enforcing exclusive access to it.
+
+- Borrow checker can ensure a type `T` to be `Sync` if and only if `&T` is `Send`.
+
+Almost all primitives are `Send` and `Sync`, and as a consequence pretty much all types you'll ever interact with are `Send` and `Sync`.
+
+Major exceptions include:
+
+- raw pointers are neither `Send` nor `Sync` (because they have no safety guards).
+- `UnsafeCell` isn't `Sync` (and therefore `Cell` and `RefCell` aren't).
+- `Rc` isn't `Send` or `Sync` (because the refcount is shared and unsynchronized).
